@@ -1,15 +1,75 @@
+<!DOCTYPE html>
 <html>
 
 <head>
     <title>薄纱微信公众号</title>
     <meta charset="utf-8" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        p {
+            margin-bottom: 10px;
+        }
+
+        input[type="number"] {
+            width: 50px;
+            padding: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        label {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4caf50;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #canvas {
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            background-color: #fff;
+        }
+
+        #output {
+            display: block;
+            margin: 20px auto;
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
     <script type="text/javascript">
         function $(id) {
             return document.getElementById(id);
         }
-        
-        function processImg(image) {
 
+        function processImg(image) {
             factor = (image.height * image.width) / 32;
 
             var canvas = $('canvas');
@@ -41,7 +101,18 @@
                 context.lineWidth = LineWidth;
                 context.beginPath();
                 context.moveTo(x, y);
-                context.lineTo(x + random(- random(0, canvas.width / (101-LineLength)), random(0, canvas.width / (101-LineLength))), y + random(- random(0, canvas.width / (101-LineLength)), random(0, canvas.width / (101-LineLength)))); //线段长度
+                context.lineTo(
+                    x +
+                        random(
+                            -random(0, canvas.width / (101 - LineLength)),
+                            random(0, canvas.width / (101 - LineLength))
+                        ),
+                    y +
+                        random(
+                            -random(0, canvas.width / (101 - LineLength)),
+                            random(0, canvas.width / (101 - LineLength))
+                        )
+                ); //线段长度
                 context.closePath();
                 context.stroke();
             }
@@ -55,61 +126,56 @@
             return Math.round(Math.random() * (max - min)) + min;
         }
 
-
         function showImg(input) {
             var file = input.files[0];
-            var reader = new FileReader()
+            var reader = new FileReader();
 
             reader.onload = function (e) {
-
                 var image = new Image();
-
                 image.src = reader.result;
 
                 image.onload = function () {
-
                     processImg(this);
                     document.getElementById('uploaded').src = image.src;
                     console.log("onLoaded:" + image.width + "*" + image.height);
                 };
-            }
+            };
             reader.readAsDataURL(file);
         }
     </script>
-    <style>
-    </style>
 </head>
-<h2>
+
 <body>
-<p>
-  <td> 
-    线段长度 <input type="number" id='LineLength' value="5"/> (1~100,默认为5)
-  </td>
-</p>
-<p>
-  <td> 
-    线段宽度 <input type="number" id='LineWidth' value="1"/> (1~10,默认为1)
-  </td>
-</p>
-<p>
-  <td> 
-    点的大小 <input type="number" id='PointSize' value="2"/> (1~10,默认为2)
-  </td>
-</p>
-</h2>
-<h3>先填写上方参数, 后选择文件即可生成. 重新生成需刷新页面</h3>
-<h1>
-<div>
-    <div style="text-align: top">
-        <input id="upload-input" 
-        type="file" accept="image/jpg, image/png" onchange="showImg(this)"/>
+    <h1>薄纱微信公众号</h1>
+
+    <h2>参数设置</h2>
+    <p>
+        线段长度
+        <input type="number" id="LineLength" value="5" min="1" max="100" />
+        (1~100，默认为5)
+    </p>
+    <p>
+        线段宽度
+        <input type="number" id="LineWidth" value="1" min="1" max="10" />
+        (1~10，默认为1)
+    </p>
+    <p>
+        点的大小
+        <input type="number" id="PointSize" value="2" min="1" max="10" />
+        (1~10，默认为2)
+    </p>
+
+    <h3>先填写上方参数，后选择文件即可生成。重新生成需刷新页面。</h3>
+
+    <div>
+        <label for="upload-input">选择文件</label>
+        <input id="upload-input" type="file" accept="image/jpg, image/png" onchange="showImg(this)" />
     </div>
 
     <p>
-      <canvas id="canvas" width="0" height="0"></canvas>
+        <canvas id="canvas" width="0" height="0"></canvas>
     </p>
-</div>
-</h1>
+
 </body>
 
 </html>
