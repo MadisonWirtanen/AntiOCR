@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>薄纱微信公众号</title>
+    <title>对抗OCR</title>
     <meta charset="utf-8" />
     <style>
         body {
@@ -64,85 +64,6 @@
             height: auto;
         }
     </style>
-    <script type="text/javascript">
-        function $(id) {
-            return document.getElementById(id);
-        }
-
-        function processImg(image) {
-            factor = (image.height * image.width) / 32;
-
-            var canvas = $('canvas');
-            canvas.width = image.width;
-            canvas.height = image.height;
-            var context = canvas.getContext('2d');
-            context.drawImage(image, 0, 0);
-
-            var PointSize = $('PointSize').value || 1;
-            //draw points randomly.
-            n2 = factor / 4;
-            for (var i = 0; i < n2; i++) {
-                x = random(0, canvas.width);
-                y = random(0, canvas.height);
-                context.lineWidth = PointSize;
-                context.beginPath();
-                context.moveTo(x, y);
-                context.lineTo(x + 1, y + 1);
-                context.closePath();
-                context.stroke();
-            }
-            i = 0;
-            var LineLength = $('LineLength').value || 1;
-            var LineWidth = $('LineWidth').value || 1;
-            //draw lines randomly.
-            for (var i = 0; i < factor / 50; i++) {
-                x = random(0, canvas.width);
-                y = random(0, canvas.height);
-                context.lineWidth = LineWidth;
-                context.beginPath();
-                context.moveTo(x, y);
-                context.lineTo(
-                    x +
-                        random(
-                            -random(0, canvas.width / (101 - LineLength)),
-                            random(0, canvas.width / (101 - LineLength))
-                        ),
-                    y +
-                        random(
-                            -random(0, canvas.width / (101 - LineLength)),
-                            random(0, canvas.width / (101 - LineLength))
-                        )
-                ); //线段长度
-                context.closePath();
-                context.stroke();
-            }
-
-            var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            var img = $("output");
-            img.src = canvas.toDataURL("image/png");
-        }
-
-        function random(min, max) {
-            return Math.round(Math.random() * (max - min)) + min;
-        }
-
-        function showImg(input) {
-            var file = input.files[0];
-            var reader = new FileReader();
-
-            reader.onload = function (e) {
-                var image = new Image();
-                image.src = reader.result;
-
-                image.onload = function () {
-                    processImg(this);
-                    document.getElementById('uploaded').src = image.src;
-                    console.log("onLoaded:" + image.width + "*" + image.height);
-                };
-            };
-            reader.readAsDataURL(file);
-        }
-    </script>
 </head>
 
 <body>
@@ -152,30 +73,109 @@
     <p>
         线段长度
         <input type="number" id="LineLength" value="5" min="1" max="100" />
-        (1~100，默认为5)
+        (1~100, 默认为5)
     </p>
     <p>
         线段宽度
         <input type="number" id="LineWidth" value="1" min="1" max="10" />
-        (1~10，默认为1)
+        (1~10, 默认为1)
     </p>
     <p>
         点的大小
         <input type="number" id="PointSize" value="2" min="1" max="10" />
-        (1~10，默认为2)
+        (1~10, 默认为2)
     </p>
 
     <h3>先填写上方参数，后选择文件即可生成。重新生成需刷新页面。</h3>
 
     <div>
         <label for="upload-input">选择文件</label>
-        <input id="upload-input" type="file" accept="image/jpg, image/png" onchange="showImg(this)" />
+        <input id="upload-input" type="file" accept="image/jpg, image/png">
     </div>
 
     <p>
         <canvas id="canvas" width="0" height="0"></canvas>
     </p>
 
+    <script src="path/to/file.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const canvas = document.getElementById("canvas");
+            const LineLength = document.getElementById("LineLength");
+            const LineWidth = document.getElementById("LineWidth");
+            const PointSize = document.getElementById("PointSize");
+            const uploadInput = document.getElementById("upload-input");
+
+            function processImg(image) {
+                const factor = (image.height * image.width) / 32;
+                canvas.width = image.width;
+                canvas.height = image.height;
+                const context = canvas.getContext("2d");
+                context.drawImage(image, 0, 0);
+
+                const n2 = factor / 4;
+                for (let i = 0; i < n2; i++) {
+                    const x = random(0, canvas.width);
+                    const y = random(0, canvas.height);
+                    context.lineWidth = PointSize.value || 1;
+                    context.beginPath();
+                    context.moveTo(x, y);
+                    context.lineTo(x + 1, y + 1);
+                    context.closePath();
+                    context.stroke();
+                }
+
+                for (let i = 0; i < factor / 50; i++) {
+                    const x = random(0, canvas.width);
+                    const y = random(0, canvas.height);
+                    context.lineWidth = LineWidth.value || 1;
+                    context.beginPath();
+                    context.moveTo(x, y);
+                    context.lineTo(
+                        x +
+                            random(
+                                -random(0, canvas.width / (101 - LineLength.value)),
+                                random(0, canvas.width / (101 - LineLength.value))
+                            ),
+                        y +
+                            random(
+                                -random(0, canvas.width / (101 - LineLength.value)),
+                                random(0, canvas.width / (101 - LineLength.value))
+                            )
+                    );
+                    context.closePath();
+                    context.stroke();
+                }
+
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const outputImg = document.getElementById("output");
+                outputImg.src = canvas.toDataURL("image/png");
+            }
+
+            function random(min, max) {
+                return Math.round(Math.random() * (max - min)) + min;
+            }
+
+            function showImg() {
+                const file = uploadInput.files[0];
+                const reader = new FileReader();
+
+                reader.onload = function (e) {
+                    const image = new Image();
+                    image.src = reader.result;
+
+                    image.onload = function () {
+                        processImg(this);
+                        document.getElementById("uploaded").src = image.src;
+                        console.log("onLoaded:" + image.width + "*" + image.height);
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+
+            uploadInput.addEventListener("change", showImg);
+        });
+    </script>
 </body>
 
 </html>
