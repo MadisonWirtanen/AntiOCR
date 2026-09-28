@@ -1,180 +1,1000 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="zh-CN">
 <head>
-    <title>对抗OCR</title>
-    <meta charset="utf-8" />
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            margin: 0;
-            padding: 20px;
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        h2 {
-            margin-bottom: 20px;
-        }
-
-        h3 {
-            text-align: center;
-            margin-top: 30px;
-        }
-
-        p {
-            margin-bottom: 10px;
-        }
-
-        input[type="number"] {
-            width: 50px;
-            padding: 5px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        label {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #4caf50;
-            color: #fff;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-
-        #canvas {
-            display: block;
-            margin: 0 auto;
-            border: 1px solid #ccc;
-            background-color: #fff;
-        }
-
-        #output {
-            display: block;
-            margin: 20px auto;
-            max-width: 100%;
-            height: auto;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AntiOCR：在浏览器本地将图片转换为适合微信发送的 GIF，或生成带文字结构扰动的 PNG / JPG 静态图片。" />
+  <meta name="theme-color" content="#315efb" />
+  <title>AntiOCR</title>
+  <style>
+    :root{
+      --bg:#f6f8fc;
+      --panel:rgba(255,255,255,.96);
+      --line:#e5e7eb;
+      --text:#172033;
+      --muted:#667085;
+      --accent:#315efb;
+      --accent2:#2446c9;
+      --good:#079455;
+      --warn:#b54708;
+      --radius:18px;
+      --shadow:0 14px 40px rgba(15,23,42,.07);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0d1117;
+        --panel:rgba(22,27,34,.96);
+        --line:#30363d;
+        --text:#f0f4fa;
+        --muted:#9aa4b2;
+        --accent:#6d8cff;
+        --accent2:#8aa2ff;
+        --good:#32d583;
+        --warn:#fdb022;
+        --shadow:0 14px 40px rgba(0,0,0,.24);
+      }
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(49,94,251,.07), transparent 28%),
+        radial-gradient(circle at 92% 8%, rgba(125,90,255,.05), transparent 22%),
+        var(--bg);
+      color:var(--text);
+      font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif;
+    }
+    button,input,select{font:inherit}
+    .wrap{width:min(1080px,calc(100% - 28px));margin:0 auto;padding:32px 0 52px}
+    .hero{
+      display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:18px
+    }
+    .hero h1{
+      margin:0;font-size:clamp(28px,4vw,40px);line-height:1.08;letter-spacing:-.04em
+    }
+    .hero p{margin:8px 0 0;color:var(--muted);max-width:720px}
+    .badge{
+      white-space:nowrap;border:1px solid var(--line);background:var(--panel);
+      border-radius:999px;padding:8px 12px;color:var(--muted);box-shadow:var(--shadow)
+    }
+    .panel{
+      background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:var(--shadow);backdrop-filter:blur(14px)
+    }
+    .tabs{
+      display:flex;gap:8px;padding:12px
+    }
+    .tab-btn{
+      border:1px solid var(--line);background:transparent;color:var(--text);
+      border-radius:12px;padding:11px 14px;cursor:pointer;transition:.18s ease
+    }
+    .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+    .tab-btn:hover:not(.active){border-color:var(--accent)}
+    .section{padding:18px}
+    .section + .section{border-top:1px solid var(--line)}
+    .lead{
+      border:1px solid rgba(49,94,251,.18);background:rgba(49,94,251,.06);
+      border-radius:14px;padding:14px 15px;color:var(--muted)
+    }
+    .lead strong{color:var(--text)}
+    .warning{
+      border:1px solid rgba(181,71,8,.20);background:rgba(245,158,11,.08);
+      border-radius:14px;padding:14px 15px;color:var(--muted)
+    }
+    .warning strong{color:var(--text)}
+    .drop{
+      margin-top:18px;min-height:180px;display:grid;place-items:center;text-align:center;
+      padding:24px;border:1.5px dashed #98a2b3;border-radius:var(--radius);background:var(--panel);
+      cursor:pointer;transition:.18s ease
+    }
+    .drop.drag{border-color:var(--accent);box-shadow:0 0 0 4px rgba(49,94,251,.10)}
+    .drop-icon{
+      width:58px;height:58px;margin:0 auto 12px;border-radius:17px;display:grid;place-items:center;
+      background:rgba(49,94,251,.10);color:var(--accent);font-size:27px;font-weight:700
+    }
+    .drop p{margin:6px 0 0;color:var(--muted)}
+    #fileInput{display:none}
+    .file-card{
+      display:none;margin-top:18px;padding:14px 16px
+    }
+    .file-card.show{display:block}
+    .file-meta{
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px
+    }
+    .mini{
+      border:1px solid var(--line);border-radius:12px;padding:10px 12px
+    }
+    .mini span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+    .mini b{display:block;word-break:break-all}
+    .grid{
+      display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px
+    }
+    .card{
+      border:1px solid var(--line);border-radius:14px;padding:14px
+    }
+    .card h3{margin:0 0 10px;font-size:16px}
+    .stack{display:grid;gap:10px}
+    .field label{
+      display:block;margin-bottom:6px;color:var(--muted);font-size:13px
+    }
+    .mode-row{display:flex;gap:8px;flex-wrap:wrap}
+    .mode-btn{
+      border:1px solid var(--line);background:transparent;color:var(--text);
+      border-radius:10px;padding:9px 11px;cursor:pointer;transition:.18s ease
+    }
+    .mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+    .mode-btn:hover:not(.active){border-color:var(--accent)}
+    input[type="number"], select{
+      width:100%;border:1px solid var(--line);background:transparent;color:var(--text);
+      border-radius:10px;padding:9px 10px
+    }
+    input[type="range"]{width:100%;accent-color:var(--accent)}
+    .range-head{
+      display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:var(--muted);font-size:13px
+    }
+    .inline2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .inline3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{
+      border:1px solid var(--line);border-radius:11px;padding:10px 14px;background:transparent;
+      color:var(--text);cursor:pointer;transition:.18s ease;white-space:nowrap
+    }
+    .btn:hover:not(:disabled){border-color:var(--accent)}
+    .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn.primary:hover:not(:disabled){background:var(--accent2)}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .status-bar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;
+      padding:12px 14px;border-top:1px solid var(--line);flex-wrap:wrap
+    }
+    .status{
+      display:flex;align-items:center;gap:8px;min-width:0
+    }
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--good);flex:none}
+    .dot.busy{background:var(--warn);animation:pulse 1s infinite alternate}
+    @keyframes pulse{to{opacity:.42}}
+    #statusText{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    progress{width:160px;height:9px;accent-color:var(--accent)}
+    .result{
+      display:none;margin-top:18px;padding:14px 16px
+    }
+    .result.show{display:block}
+    .result-grid{
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px
+    }
+    .subtle{color:var(--muted);font-size:13px}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    .preview-card{margin-top:18px}
+    .preview-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+    .preview-head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .preview-empty{
+      border:1px dashed var(--line);
+      border-radius:14px;
+      padding:28px 16px;
+      text-align:center;
+      color:var(--muted);
+      background:rgba(127,127,127,.03)
+    }
+    .preview-shell{
+      border:1px solid var(--line);
+      border-radius:14px;
+      overflow:auto;
+      max-height:72vh;
+      display:grid;
+      place-items:start center;
+      background:
+        linear-gradient(45deg,#e8ebf0 25%,transparent 25%),
+        linear-gradient(-45deg,#e8ebf0 25%,transparent 25%),
+        linear-gradient(45deg,transparent 75%,#e8ebf0 75%),
+        linear-gradient(-45deg,transparent 75%,#e8ebf0 75%);
+      background-size:18px 18px;
+      background-position:0 0,0 9px,9px -9px,-9px 0;
+    }
+    @media (prefers-color-scheme: dark){
+      .preview-shell{
+        background:
+          linear-gradient(45deg,#181d25 25%,transparent 25%),
+          linear-gradient(-45deg,#181d25 25%,transparent 25%),
+          linear-gradient(45deg,transparent 75%,#181d25 75%),
+          linear-gradient(-45deg,transparent 75%,#181d25 75%);
+        background-size:18px 18px;
+        background-position:0 0,0 9px,9px -9px,-9px 0;
+      }
+    }
+    #staticPreviewCanvas{
+      display:block;
+      max-width:100%;
+      height:auto;
+      background:#fff;
+    }
+    .advanced{
+      margin-top:8px;border-top:1px solid var(--line);padding-top:10px
+    }
+    .advanced summary{cursor:pointer;color:var(--muted);font-size:13px}
+    .helper{font-size:12px;color:var(--muted)}
+    .hidden{display:none !important}
+    @media (max-width:900px){
+      .hero{flex-direction:column;align-items:flex-start}
+      .grid{grid-template-columns:1fr}
+      .file-meta,.result-grid{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width:620px){
+      .tabs{flex-direction:column}
+      .inline2,.inline3,.file-meta,.result-grid{grid-template-columns:1fr}
+      .status-bar{align-items:flex-start}
+      progress{width:120px}
+    }
+  </style>
 </head>
-
 <body>
-    <h1>对抗OCR</h1>
+  <main class="wrap">
+    <header class="hero">
+      <div>
+        <h1>AntiOCR</h1>
+        <p>面向图片文字隐私保护场景，提供微信 GIF 与静态图片两种处理方式。图片仅在浏览器本地处理。</p>
+      </div>
+      <div class="badge">本地处理 · 图片不上传</div>
+    </header>
 
-    <h2>参数设置</h2>
-    <p>
-        线段长度
-        <input type="number" id="LineLength" value="5" min="1" max="100" />
-        (1~100, 默认为5)
-    </p>
-    <p>
-        线段宽度
-        <input type="number" id="LineWidth" value="1" min="1" max="10" />
-        (1~10, 默认为1)
-    </p>
-    <p>
-        点的大小
-        <input type="number" id="PointSize" value="2" min="1" max="10" />
-        (1~10, 默认为2)
-    </p>
+    <section class="panel">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="gif">微信 GIF 模式</button>
+        <button class="tab-btn" data-tab="static">静态图片模式</button>
+      </div>
 
-    <h3>先填写上方参数，后选择文件即可生成。重新生成需刷新页面。</h3>
+      <div class="section">
+        <div class="lead" id="gifIntro">
+          <strong>方案说明：</strong>
+          在部分微信客户端环境中，GIF 的文字识别行为与普通静态图片不同，因此可优先尝试 GIF 模式。
+          具体效果可能随客户端版本、图片内容和识别策略变化，本工具不承诺在所有环境下均能阻止文字识别。
+        </div>
+        <div class="warning hidden" id="staticIntro" style="margin-top:0">
+          <strong>方案说明：</strong>
+          静态图片模式通过行级扰动、微断笔、伪轮廓与纹理干扰改变文字结构，以降低部分 OCR 的识别稳定性。
+          实际效果取决于图片内容与识别引擎，<strong>无法保证完全阻止识别</strong>。如主要用于微信发送，可优先尝试 GIF 模式。
+        </div>
 
-    <div>
-        <label for="upload-input">选择文件</label>
-        <input id="upload-input" type="file" accept="image/jpg, image/png">
-    </div>
+        <label class="drop" id="dropZone" for="fileInput">
+          <div>
+            <div class="drop-icon">＋</div>
+            <strong>点击、拖入或粘贴图片</strong>
+            <p>支持 PNG / JPEG / WebP</p>
+          </div>
+        </label>
+        <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/*">
 
-    <p>
-        <canvas id="canvas" width="0" height="0"></canvas>
-    </p>
+        <div class="panel file-card" id="fileCard">
+          <div class="file-meta">
+            <div class="mini">
+              <span>文件名</span>
+              <b id="fileName">—</b>
+            </div>
+            <div class="mini">
+              <span>原始尺寸</span>
+              <b id="fileDims">—</b>
+            </div>
+            <div class="mini">
+              <span>模式</span>
+              <b id="currentModeText">—</b>
+            </div>
+            <div class="mini">
+              <span>处理状态</span>
+              <b id="currentStateText">待处理</b>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section tab-panel active" id="panel-gif">
+        <div class="grid">
+          <div class="card">
+            <h3>生成设置</h3>
+            <div class="stack">
+              <div class="field">
+                <label>生成方式</label>
+                <div class="mode-row">
+                  <button class="mode-btn active" data-gif-mode="compat">兼容模式</button>
+                  <button class="mode-btn" data-gif-mode="hphase">四相模式</button>
+                </div>
+                <div class="helper">兼容模式适合日常发送；四相模式可作为补充方案。</div>
+              </div>
+
+              <div class="field">
+                <div class="range-head">
+                  <span>最大边长</span>
+                  <span><span id="gifMaxEdgeLabel">1400</span> px</span>
+                </div>
+                <input id="gifMaxEdge" type="range" min="800" max="2200" step="100" value="1400">
+              </div>
+
+              <div class="inline2">
+                <div class="field">
+                  <label for="gifDelayA">主帧延迟</label>
+                  <input id="gifDelayA" type="number" min="40" max="120000" step="10" value="60000">
+                </div>
+                <div class="field">
+                  <label for="gifDelayB">次帧延迟</label>
+                  <input id="gifDelayB" type="number" min="20" max="1000" step="10" value="50">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>适用场景</h3>
+            <div class="stack subtle">
+              <div>• 适用于需要在微信中发送含文字图片的场景。</div>
+              <div>• 建议直接发送 <strong>下载后的 GIF 文件</strong>，不要截图或转回静态图片。</div>
+              <div>• <strong>兼容模式</strong> 适合多数日常使用场景。</div>
+              <div>• <strong>四相模式</strong> 使用多帧结构，可在兼容模式之外作为补充方案。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section tab-panel" id="panel-static">
+        <div class="grid">
+          <div class="card">
+            <h3>导出设置</h3>
+            <div class="stack">
+              <div class="field">
+                <label>预设方案</label>
+                <div class="mode-row">
+                  <button class="mode-btn" data-static-preset="reading">阅读优先</button>
+                  <button class="mode-btn active" data-static-preset="balanced">平衡</button>
+                  <button class="mode-btn" data-static-preset="blocking">拦截优先</button>
+                </div>
+                <div class="helper">通过行级扰动、微断笔、伪轮廓与纹理干扰等手段，对文字结构进行轻度到中度干预。</div>
+              </div>
+
+              <div class="field">
+                <div class="range-head">
+                  <span>总体强度</span>
+                  <span><span id="staticStrengthLabel">58</span>%</span>
+                </div>
+                <input id="staticStrength" type="range" min="0" max="100" step="1" value="58">
+              </div>
+
+              <div class="inline2">
+                <div class="field">
+                  <label for="staticFormat">导出格式</label>
+                  <select id="staticFormat">
+                    <option value="png">PNG</option>
+                    <option value="jpeg">JPG</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="staticJpegQuality">JPG 质量</label>
+                  <input id="staticJpegQuality" type="number" min="50" max="95" step="1" value="88">
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="range-head">
+                  <span>最大边长</span>
+                  <span><span id="staticMaxEdgeLabel">1600</span> px</span>
+                </div>
+                <input id="staticMaxEdge" type="range" min="800" max="2400" step="100" value="1600">
+              </div>
+
+              <details class="advanced">
+                <summary>高级参数</summary>
+                <div class="stack" style="margin-top:10px">
+                  <div class="field">
+                    <div class="range-head">
+                      <span>行级扰动</span>
+                      <span><span id="lineJitterLabel">1.95</span> px</span>
+                    </div>
+                    <input id="lineJitter" type="range" min="0" max="4.5" step="0.05" value="1.95">
+                  </div>
+                  <div class="field">
+                    <div class="range-head">
+                      <span>微断笔</span>
+                      <span><span id="microBreaksLabel">58</span>%</span>
+                    </div>
+                    <input id="microBreaks" type="range" min="0" max="100" step="1" value="58">
+                  </div>
+                  <div class="field">
+                    <div class="range-head">
+                      <span>伪轮廓</span>
+                      <span><span id="pseudoContourLabel">38</span>%</span>
+                    </div>
+                    <input id="pseudoContour" type="range" min="0" max="100" step="1" value="38">
+                  </div>
+                  <div class="field">
+                    <div class="range-head">
+                      <span>纹理干扰</span>
+                      <span><span id="textureNoiseLabel">42</span>%</span>
+                    </div>
+                    <input id="textureNoise" type="range" min="0" max="100" step="1" value="42">
+                  </div>
+                  <div class="field">
+                    <div class="range-head">
+                      <span>前景阈值</span>
+                      <span><span id="fgThresholdLabel">184</span></span>
+                    </div>
+                    <input id="fgThreshold" type="range" min="120" max="230" step="1" value="184">
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>方案说明</h3>
+            <div class="stack subtle">
+              <div>• 适用于需要导出单张图片的场景，如普通分享、存档或非微信平台使用。</div>
+              <div>• <strong>阅读优先</strong>：更强调文字可读性，干预较轻。</div>
+              <div>• <strong>平衡</strong>：兼顾阅读体验与抗识别强度。</div>
+              <div>• <strong>拦截优先</strong>：结构扰动更明显，可读性也会相应下降。</div>
+              <div>• 若主要用途是微信发送，建议优先选择 <strong>GIF 模式</strong>。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card preview-card">
+          <div class="preview-head">
+            <div>
+              <h3 style="margin:0">图片预览</h3>
+              <p>静态模式下会显示当前参数对应的处理结果预览，便于对比不同方案与强度。</p>
+            </div>
+            <div class="subtle">仅用于静态图片模式</div>
+          </div>
+          <div id="staticPreviewEmpty" class="preview-empty">上传图片后，这里会显示静态图片预览。</div>
+          <div id="staticPreviewShell" class="preview-shell hidden">
+            <canvas id="staticPreviewCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div class="status">
+          <span class="dot" id="statusDot"></span>
+          <span id="statusText">等待图片</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <progress id="progressBar" max="100" value="0"></progress>
+          <button class="btn" id="replaceBtn">更换图片</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="actions">
+          <button class="btn" id="regenBtn" disabled>重新生成</button>
+          <button class="btn primary" id="downloadGifBtn" disabled>下载 GIF</button>
+          <button class="btn primary hidden" id="downloadStaticBtn" disabled>下载静态图片</button>
+        </div>
+
+        <div class="panel result" id="resultCard">
+          <div class="result-grid">
+            <div class="mini">
+              <span>输出类型</span>
+              <b id="resultType">—</b>
+            </div>
+            <div class="mini">
+              <span>输出尺寸</span>
+              <b id="resultDims">—</b>
+            </div>
+            <div class="mini">
+              <span>输出大小</span>
+              <b id="resultSize">—</b>
+            </div>
+            <div class="mini">
+              <span>输出说明</span>
+              <b id="resultNote">—</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <canvas id="workCanvasA" class="hidden"></canvas>
+    <canvas id="workCanvasB" class="hidden"></canvas>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const canvas = document.getElementById("canvas");
-            const LineLength = document.getElementById("LineLength");
-            const LineWidth = document.getElementById("LineWidth");
-            const PointSize = document.getElementById("PointSize");
-            const uploadInput = document.getElementById("upload-input");
+    (() => {
+      "use strict";
 
-            function processImg(image) {
-                const factor = (image.height * image.width) / 32;
-                canvas.width = image.width;
-                canvas.height = image.height;
-                const context = canvas.getContext("2d");
-                context.drawImage(image, 0, 0);
+      const $ = id => document.getElementById(id);
+      const canvasA = $("workCanvasA");
+      const canvasB = $("workCanvasB");
+      const staticPreviewCanvas = $("staticPreviewCanvas");
+      const ctxA = canvasA.getContext("2d", {willReadFrequently:true});
+      const ctxB = canvasB.getContext("2d", {willReadFrequently:true});
 
-                const n2 = factor / 4;
-                for (let i = 0; i < n2; i++) {
-                    const x = random(0, canvas.width);
-                    const y = random(0, canvas.height);
-                    context.lineWidth = PointSize.value || 1;
-                    context.beginPath();
-                    context.moveTo(x, y);
-                    context.lineTo(x + 1, y + 1);
-                    context.closePath();
-                    context.stroke();
-                }
+      let currentTab = "gif";
+      let loadedImage = null;
+      let currentFilename = "image";
+      let currentOutputBlob = null;
+      let currentOutputExt = "";
+      let gifMode = "compat";
+      let staticPreset = "balanced";
+      let processToken = 0;
+      let activeGifEncoder = null;
+      let gifLibraryPromise = null;
 
-                for (let i = 0; i < factor / 50; i++) {
-                    const x = random(0, canvas.width);
-                    const y = random(0, canvas.height);
-                    context.lineWidth = LineWidth.value || 1;
-                    context.beginPath();
-                    context.moveTo(x, y);
-                    context.lineTo(
-                        x +
-                            random(
-                                -random(0, canvas.width / (101 - LineLength.value)),
-                                random(0, canvas.width / (101 - LineLength.value))
-                            ),
-                        y +
-                            random(
-                                -random(0, canvas.width / (101 - LineLength.value)),
-                                random(0, canvas.width / (101 - LineLength.value))
-                            )
-                    );
-                    context.closePath();
-                    context.stroke();
-                }
-
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const outputImg = document.getElementById("output");
-                outputImg.src = canvas.toDataURL("image/png");
-            }
-
-            function random(min, max) {
-                return Math.round(Math.random() * (max - min)) + min;
-            }
-
-            function showImg() {
-                const file = uploadInput.files[0];
-                const reader = new FileReader();
-
-                reader.onload = function (e) {
-                    const image = new Image();
-                    image.src = reader.result;
-
-                    image.onload = function () {
-                        processImg(this);
-                        document.getElementById("uploaded").src = image.src;
-                        console.log("onLoaded:" + image.width + "*" + image.height);
-                    };
-                };
-                reader.readAsDataURL(file);
-            }
-
-            uploadInput.addEventListener("change", showImg);
+      function loadExternalScript(src){
+        return new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = src;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => {
+            script.remove();
+            reject(new Error("资源加载失败"));
+          };
+          document.head.appendChild(script);
         });
-    </script>
-</body>
+      }
 
-</html>
+      async function ensureGifLibrary(){
+        if (typeof GIF !== "undefined") return;
+        if (gifLibraryPromise) return gifLibraryPromise;
+
+        gifLibraryPromise = (async () => {
+          const candidates = [
+            "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js",
+            "https://unpkg.com/gif.js.optimized/dist/gif.js"
+          ];
+          let lastError = null;
+          for (const src of candidates){
+            try{
+              await loadExternalScript(src);
+              if (typeof GIF !== "undefined") return;
+            }catch(err){
+              lastError = err;
+            }
+          }
+          throw new Error(
+            "无法加载 GIF 编码组件，请确认网络连接后重试。" +
+            (lastError ? " (" + lastError.message + ")" : "")
+          );
+        })();
+
+        try{
+          await gifLibraryPromise;
+        }catch(err){
+          gifLibraryPromise = null;
+          throw err;
+        }
+      }
+
+      let gifWorkerBlobURL = null;
+
+      function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+      function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+      function fmtBytes(bytes){
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / 1024 / 1024).toFixed(2) + " MB";
+      }
+      function setBusy(busy, text, progress){
+        $("statusDot").classList.toggle("busy", busy);
+        $("statusText").textContent = text;
+        $("currentStateText").textContent = text;
+        if (typeof progress === "number") $("progressBar").value = progress;
+        $("regenBtn").disabled = busy || !loadedImage;
+        $("downloadGifBtn").disabled = true;
+        $("downloadStaticBtn").disabled = true;
+        if (!busy && currentOutputBlob){
+          if (currentTab === "gif") $("downloadGifBtn").disabled = false;
+          else $("downloadStaticBtn").disabled = false;
+        }
+      }
+      function showResult(type, dims, size, note){
+        $("resultCard").classList.add("show");
+        $("resultType").textContent = type;
+        $("resultDims").textContent = dims;
+        $("resultSize").textContent = size;
+        $("resultNote").textContent = note;
+      }
+      function resetResult(){
+        currentOutputBlob = null;
+        currentOutputExt = "";
+        $("resultCard").classList.remove("show");
+        $("downloadGifBtn").disabled = true;
+        $("downloadStaticBtn").disabled = true;
+      }
+      function setTab(tab){
+        currentTab = tab;
+        document.querySelectorAll(".tab-btn").forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.tab === tab);
+        });
+        document.querySelectorAll(".tab-panel").forEach(panel => {
+          panel.classList.toggle("active", panel.id === "panel-" + tab);
+        });
+
+        $("gifIntro").classList.toggle("hidden", tab !== "gif");
+        $("staticIntro").classList.toggle("hidden", tab !== "static");
+        $("downloadGifBtn").classList.toggle("hidden", tab !== "gif");
+        $("downloadStaticBtn").classList.toggle("hidden", tab !== "static");
+        $("currentModeText").textContent = tab === "gif" ? "微信 GIF 模式" : "静态图片模式";
+
+        if (tab !== "static") {
+          clearStaticPreview();
+        }
+        resetResult();
+        if (loadedImage) {
+          $("regenBtn").disabled = false;
+          processCurrent();
+        }
+      }
+      function updateFileCard(img){
+        $("fileCard").classList.add("show");
+        $("fileDims").textContent = `${img.naturalWidth || img.width} × ${img.naturalHeight || img.height}`;
+        $("currentModeText").textContent = currentTab === "gif" ? "微信 GIF 模式" : "静态图片模式";
+      }
+      async function fileToImage(file){
+        if (!file || !file.type.startsWith("image/")) throw new Error("请选择图片文件");
+        const url = URL.createObjectURL(file);
+        try{
+          const img = new Image();
+          img.decoding = "async";
+          img.src = url;
+          await img.decode();
+          return img;
+        } finally {
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+      }
+      function prepareCanvas(img, maxEdge, canvas, ctx){
+        const nw = img.naturalWidth || img.width;
+        const nh = img.naturalHeight || img.height;
+        const scale = Math.min(1, maxEdge / Math.max(nw, nh));
+        const w = Math.max(1, Math.round(nw * scale));
+        const h = Math.max(1, Math.round(nh * scale));
+        canvas.width = w;
+        canvas.height = h;
+        ctx.clearRect(0,0,w,h);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img,0,0,w,h);
+        return {w,h};
+      }
+
+      function clearStaticPreview(){
+        if (!staticPreviewCanvas) return;
+        staticPreviewCanvas.width = 1;
+        staticPreviewCanvas.height = 1;
+        $("staticPreviewShell").classList.add("hidden");
+        $("staticPreviewEmpty").classList.remove("hidden");
+      }
+
+      function renderStaticPreview(sourceCanvas){
+        if (!staticPreviewCanvas || !sourceCanvas) return;
+        staticPreviewCanvas.width = sourceCanvas.width;
+        staticPreviewCanvas.height = sourceCanvas.height;
+        const previewCtx = staticPreviewCanvas.getContext("2d", {willReadFrequently:true});
+        previewCtx.clearRect(0, 0, staticPreviewCanvas.width, staticPreviewCanvas.height);
+        previewCtx.drawImage(sourceCanvas, 0, 0);
+        $("staticPreviewEmpty").classList.add("hidden");
+        $("staticPreviewShell").classList.remove("hidden");
+      }
+
+      function buildGifCompatFrames(){
+        const maxEdge = Number($("gifMaxEdge").value) || 1400;
+        const base = prepareCanvas(loadedImage, maxEdge, canvasA, ctxA);
+        prepareCanvas(loadedImage, maxEdge, canvasB, ctxB);
+
+        const markSize = 2;
+        const x = Math.max(0, canvasB.width - markSize - 1);
+        const y = Math.max(0, canvasB.height - markSize - 1);
+        const img = ctxB.getImageData(x, y, markSize, markSize);
+        for (let i=0; i<img.data.length; i+=4){
+          img.data[i]   = Math.max(0, img.data[i] - 18);
+          img.data[i+1] = Math.max(0, img.data[i+1] - 18);
+          img.data[i+2] = Math.max(0, img.data[i+2] - 18);
+        }
+        ctxB.putImageData(img, x, y);
+        return {
+          canvases:[canvasA, canvasB],
+          delays:[
+            clamp(Number($("gifDelayA").value) || 60000, 40, 120000),
+            clamp(Number($("gifDelayB").value) || 50, 20, 1000)
+          ],
+          dims:`${base.w} × ${base.h}`
+        };
+      }
+
+      function buildGifHPhaseFrames(){
+        const maxEdge = Number($("gifMaxEdge").value) || 1400;
+        const base = prepareCanvas(loadedImage, maxEdge, canvasA, ctxA);
+        const src = ctxA.getImageData(0,0,canvasA.width,canvasA.height);
+        const frames = [];
+        let sum = 0;
+        for (let i=0;i<src.data.length;i+=16){
+          const g = (src.data[i]*77 + src.data[i+1]*150 + src.data[i+2]*29) >> 8;
+          sum += g;
+        }
+        const avg = Math.round(sum / (src.data.length/16));
+        const bg = [avg, avg, avg];
+
+        for (let phase=0; phase<4; phase++){
+          const c = document.createElement("canvas");
+          c.width = canvasA.width;
+          c.height = canvasA.height;
+          const cx = c.getContext("2d", {willReadFrequently:true});
+          const img = new ImageData(new Uint8ClampedArray(src.data), c.width, c.height);
+          const d = img.data;
+
+          for (let y=0; y<c.height; y++){
+            for (let x=0; x<c.width; x++){
+              const idx = y*c.width + x;
+              const p = idx*4;
+              const gray = (d[p]*77 + d[p+1]*150 + d[p+2]*29) >> 8;
+              const textLike = gray < 170;
+              if (textLike && (y % 4) !== phase){
+                d[p] = bg[0];
+                d[p+1] = bg[1];
+                d[p+2] = bg[2];
+              }
+            }
+          }
+          cx.putImageData(img,0,0);
+          frames.push(c);
+        }
+
+        const d = clamp(Number($("gifDelayB").value) || 50, 20, 1000);
+        return {
+          canvases:frames,
+          delays:[d,d,d,d],
+          dims:`${base.w} × ${base.h}`
+        };
+      }
+
+      function applyPreset(name){
+        const presets = {
+          reading: {strength:42, jitter:1.30, breaks:28, contour:18, texture:20, threshold:178},
+          balanced:{strength:58, jitter:1.95, breaks:58, contour:38, texture:42, threshold:184},
+          blocking:{strength:76, jitter:2.85, breaks:72, contour:56, texture:58, threshold:192}
+        };
+        const p = presets[name];
+        $("staticStrength").value = p.strength;
+        $("lineJitter").value = p.jitter.toFixed(2);
+        $("microBreaks").value = p.breaks;
+        $("pseudoContour").value = p.contour;
+        $("textureNoise").value = p.texture;
+        $("fgThreshold").value = p.threshold;
+        updateSliderLabels();
+      }
+
+      function updateSliderLabels(){
+        $("gifMaxEdgeLabel").textContent = $("gifMaxEdge").value;
+        $("staticMaxEdgeLabel").textContent = $("staticMaxEdge").value;
+        $("staticStrengthLabel").textContent = $("staticStrength").value;
+        $("lineJitterLabel").textContent = Number($("lineJitter").value).toFixed(2);
+        $("microBreaksLabel").textContent = $("microBreaks").value;
+        $("pseudoContourLabel").textContent = $("pseudoContour").value;
+        $("textureNoiseLabel").textContent = $("textureNoise").value;
+        $("fgThresholdLabel").textContent = $("fgThreshold").value;
+      }
+
+      function buildStaticImage(){
+        const maxEdge = Number($("staticMaxEdge").value) || 1600;
+        const {w,h} = prepareCanvas(loadedImage, maxEdge, canvasA, ctxA);
+        const img = ctxA.getImageData(0,0,w,h);
+        const src = new Uint8ClampedArray(img.data);
+        const d = img.data;
+
+        // 百分比控件保持标准 0–100%；静态干扰的实际权重相对基础方案增强 1.5 倍。
+        const STATIC_EFFECT_SCALE = 1.5;
+        const overall = Number($("staticStrength").value) / 100;
+        const jitter = Number($("lineJitter").value) * overall;
+        const microBreaks = Number($("microBreaks").value) / 100 * overall * STATIC_EFFECT_SCALE;
+        const pseudoContour = Number($("pseudoContour").value) / 100 * overall * STATIC_EFFECT_SCALE;
+        const textureNoise = Number($("textureNoise").value) / 100 * overall * STATIC_EFFECT_SCALE;
+        const fgThreshold = Number($("fgThreshold").value);
+
+        const grayAt = (arr, p) => ((arr[p]*77 + arr[p+1]*150 + arr[p+2]*29) >> 8);
+
+        // 1) 行级扰动 / 水平轻扭曲
+        if (jitter > 0.02){
+          for (let y=0; y<h; y++){
+            const offset = Math.round(
+              Math.sin(y * 0.38) * jitter +
+              Math.sin(y * 0.11 + 1.2) * jitter * 0.6
+            );
+            if (!offset) continue;
+
+            const row = new Uint8ClampedArray(w * 4);
+            for (let x=0; x<w; x++){
+              const sx = clamp(x - offset, 0, w - 1);
+              const sp = (y * w + sx) * 4;
+              const dp = x * 4;
+              row[dp] = src[sp];
+              row[dp+1] = src[sp+1];
+              row[dp+2] = src[sp+2];
+              row[dp+3] = src[sp+3];
+            }
+            for (let x=0; x<w; x++){
+              const p = (y * w + x) * 4;
+              const g = grayAt(src, p);
+              if (g < fgThreshold){
+                const rp = x * 4;
+                d[p] = row[rp];
+                d[p+1] = row[rp+1];
+                d[p+2] = row[rp+2];
+              }
+            }
+          }
+        }
+
+        // 2) 微断笔
+        if (microBreaks > 0.01){
+          for (let y=2; y<h-2; y++){
+            for (let x=2; x<w-2; x++){
+              const p = (y * w + x) * 4;
+              const g = grayAt(d, p);
+              if (g < fgThreshold - 10){
+                const pattern = ((x * 13 + y * 7) % 100) / 100;
+                if (pattern < microBreaks * 0.23){
+                  const lift = 20 + Math.round(70 * microBreaks);
+                  d[p] = Math.min(255, d[p] + lift);
+                  d[p+1] = Math.min(255, d[p+1] + lift);
+                  d[p+2] = Math.min(255, d[p+2] + lift);
+                }
+              }
+            }
+          }
+        }
+
+        // 3) 伪轮廓 / 局部边缘亮暗变化
+        if (pseudoContour > 0.01){
+          const clone = new Uint8ClampedArray(d);
+          for (let y=1; y<h-1; y++){
+            for (let x=1; x<w-1; x++){
+              const p = (y * w + x) * 4;
+              const g = grayAt(clone, p);
+              if (g > fgThreshold) continue;
+
+              const left = grayAt(clone, ((y * w + (x-1)) * 4));
+              const right = grayAt(clone, ((y * w + (x+1)) * 4));
+              const up = grayAt(clone, ((((y-1) * w) + x) * 4));
+              const down = grayAt(clone, ((((y+1) * w) + x) * 4));
+              const edge = Math.abs(right-left) + Math.abs(down-up);
+
+              if (edge > 25){
+                const sign = ((x + y) % 2 === 0) ? 1 : -1;
+                const delta = Math.round((8 + edge * 0.08) * pseudoContour) * sign;
+                d[p] = clamp(d[p] + delta, 0, 255);
+                d[p+1] = clamp(d[p+1] + delta, 0, 255);
+                d[p+2] = clamp(d[p+2] + delta, 0, 255);
+              }
+            }
+          }
+        }
+
+        // 4) 纹理干扰 / 轻噪点
+        if (textureNoise > 0.01){
+          for (let y=0; y<h; y++){
+            for (let x=0; x<w; x++){
+              const p = (y * w + x) * 4;
+              const g = grayAt(d, p);
+              if (g < fgThreshold + 8){
+                const noiseSeed = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+                const n = noiseSeed - Math.floor(noiseSeed);
+                const delta = Math.round((n * 2 - 1) * 18 * textureNoise);
+                d[p] = clamp(d[p] + delta, 0, 255);
+                d[p+1] = clamp(d[p+1] + delta, 0, 255);
+                d[p+2] = clamp(d[p+2] + delta, 0, 255);
+              }
+            }
+          }
+        }
+
+        ctxA.putImageData(img, 0, 0);
+        return {canvas: canvasA, dims:`${w} × ${h}`};
+      }
+
+      async function getGifWorkerURL(){
+        if (gifWorkerBlobURL) return gifWorkerBlobURL;
+
+        const candidates = [
+          "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js",
+          "https://unpkg.com/gif.js.optimized/dist/gif.worker.js"
+        ];
+
+        let lastError = null;
+        for (const url of candidates){
+          try{
+            $("statusText").textContent = "正在准备 GIF 编码组件…";
+            const response = await fetch(url, {method:"GET", mode:"cors", cache:"force-cache"});
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const workerSource = await response.text();
+            if (!workerSource || workerSource.length < 1000){
+              throw new Error("Worker 脚本内容异常");
+            }
+            gifWorkerBlobURL = URL.createObjectURL(new Blob([workerSource], {
+              type:"application/javascript"
+            }));
+            return gifWorkerBlobURL;
+          }catch(err){
+            console.warn("无法从该地址加载 GIF Worker:", url, err);
+            lastError = err;
+          }
+        }
+        throw new Error(
+          "无法加载 GIF 编码组件。请确认当前浏览器可以联网后刷新页面。"
+          + (lastError ? " (" + lastError.message + ")" : "")
+        );
+      }
+
+      async function encodeWithGifJS(canvases, delays, token){
+        await ensureGifLibrary();
+        const workerURL = await getGifWorkerURL();
+        return await new Promise((resolve, reject) => {
+          const gif = new GIF({
+            workers:1,
+            quality:18,
+            workerScript:workerURL,
+            width:canvases[0].width,
+            height:canvases[0].height,
+            dither:false
+          });
+          activeGifEncoder = gif;
+          canvases.forEach((canvas, i) => gif.addFrame(canvas, {copy:true, delay:delays[i]}));
+          gif.on("progress", p => {
+            if (token !== processToken) return;
+            $("progressBar").value = 55 + Math.round(p * 45);
+            $("statusText").textContent = `正在编码 GIF… ${Math.round(p * 100)}%`;
+            $("currentStateText").textContent = $("statusText").textContent;
+          });
+          gif.on("finished", blob => {
+            if (activeGifEncoder === gif) activeGifEncoder = null;
+            resolve(blob);
+          });
+          gif.on("abort", () => {
+            if (activeGifEncoder === gif) activeGifEncoder = null;
+            reject(new Error("GIF 编码已取消"));
+          });
+          try{ gif.render(); } catch(err){
+            if (activeGifEncoder === gif) activeGifEncoder = null;
+            reject(err);
+          }
+        });
+      }
+
+      async function processGIF(token){
+        setBusy(true, "正在准备 GIF…", 10);
+        await sleep(10);
+
+        const payload = gifMode === "compat" ? buildGifCompatFrames() : buildGifHPhaseFrames();
+        $("progressBar").value = 45;
+
+        const blob = await encodeWithGifJS(payload.canvases, payload.delays, token);
+        if (token !== processToken) return;
+        currentOutputBlob = blob;
+        currentOutputExt = "gif";
+        showResult("GIF", payload.dims, fmtBytes(blob.size),
+          gifMode === "compat" ? "兼容模式" : "四相动态结构");
+      }
+
+      async function processStatic(token){
+        setBusy(true, "正在处理静态图片…", 12);
+        await sleep(10);
+
+        const {canvas, dims} = buildStaticImage();
+        if (token !== processToken) return;
+        renderStaticPreview(canvas);
+        $("progressBar").value = 70;
+        await sleep(20);
+
+        const fmt = $("staticFormat").value;
+        const quality = clamp(Number($("staticJpegQuality").value) || 88, 50, 95) / 100;
+        const mime = fmt === "png" ? "image/png" : "image/jpeg";
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error("静态图片导出失败")), mime, quality);
+        });
+
+        if (token !== processToken) return;
+        currentOutputBlob = blob;
+        currentOutputExt = fmt === "png" ? "png" : "jpg";
+        showResult(fmt === "png" ? "PNG" : "JPG", dims, fmtBytes(blob.size), "静态导出方案");
+      }
+
+      async function processCurrent(){
+        if (!loadedImage) return;
+
+        const token = ++processToken;
