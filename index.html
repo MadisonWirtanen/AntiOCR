@@ -493,6 +493,7 @@
     <canvas id="workCanvasA" class="hidden"></canvas>
     <canvas id="workCanvasB" class="hidden"></canvas>
 
+    <script src="./assets/js/gif.js"></script>
     <script>
     (() => {
       "use strict";
@@ -513,55 +514,13 @@
       let staticPreset = "balanced";
       let processToken = 0;
       let activeGifEncoder = null;
-      let gifLibraryPromise = null;
-
-      function loadExternalScript(src){
-        return new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = src;
-          script.async = true;
-          script.onload = () => resolve();
-          script.onerror = () => {
-            script.remove();
-            reject(new Error("资源加载失败"));
-          };
-          document.head.appendChild(script);
-        });
-      }
 
       async function ensureGifLibrary(){
-        if (typeof GIF !== "undefined") return;
-        if (gifLibraryPromise) return gifLibraryPromise;
-
-        gifLibraryPromise = (async () => {
-          const candidates = [
-            "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js",
-            "https://unpkg.com/gif.js.optimized/dist/gif.js"
-          ];
-          let lastError = null;
-          for (const src of candidates){
-            try{
-              await loadExternalScript(src);
-              if (typeof GIF !== "undefined") return;
-            }catch(err){
-              lastError = err;
-            }
-          }
-          throw new Error(
-            "无法加载 GIF 编码组件，请确认网络连接后重试。" +
-            (lastError ? " (" + lastError.message + ")" : "")
-          );
-        })();
-
-        try{
-          await gifLibraryPromise;
-        }catch(err){
-          gifLibraryPromise = null;
-          throw err;
+        if (typeof GIF === "undefined"){
+          throw new Error("GIF 编码组件加载失败，请刷新页面后重试。");
         }
       }
 
-      let gifWorkerBlobURL = null;
 
       function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
       function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
@@ -888,47 +847,13 @@
         return {canvas: canvasA, dims:`${w} × ${h}`};
       }
 
-      async function getGifWorkerURL(){
-        if (gifWorkerBlobURL) return gifWorkerBlobURL;
-
-        const candidates = [
-          "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js",
-          "https://unpkg.com/gif.js.optimized/dist/gif.worker.js"
-        ];
-
-        let lastError = null;
-        for (const url of candidates){
-          try{
-            $("statusText").textContent = "正在准备 GIF 编码组件…";
-            const response = await fetch(url, {method:"GET", mode:"cors", cache:"force-cache"});
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const workerSource = await response.text();
-            if (!workerSource || workerSource.length < 1000){
-              throw new Error("Worker 脚本内容异常");
-            }
-            gifWorkerBlobURL = URL.createObjectURL(new Blob([workerSource], {
-              type:"application/javascript"
-            }));
-            return gifWorkerBlobURL;
-          }catch(err){
-            console.warn("无法从该地址加载 GIF Worker:", url, err);
-            lastError = err;
-          }
-        }
-        throw new Error(
-          "无法加载 GIF 编码组件。请确认当前浏览器可以联网后刷新页面。"
-          + (lastError ? " (" + lastError.message + ")" : "")
-        );
-      }
-
       async function encodeWithGifJS(canvases, delays, token){
         await ensureGifLibrary();
-        const workerURL = await getGifWorkerURL();
         return await new Promise((resolve, reject) => {
           const gif = new GIF({
             workers:1,
             quality:18,
-            workerScript:workerURL,
+            workerScript:"./assets/js/gif.worker.js",
             width:canvases[0].width,
             height:canvases[0].height,
             dither:false
@@ -998,3 +923,156 @@
         if (!loadedImage) return;
 
         const token = ++processToken;
+        if (activeGifEncoder && typeof activeGifEncoder.abort === "function"){
+          try{ activeGifEncoder.abort(); }catch(_err){}
+          activeGifEncoder = null;
+        }
+
+        resetResult();
+        try{
+          if (currentTab === "gif"){
+            await processGIF(token);
+          } else {
+            await processStatic(token);
+          }
+          if (token !== processToken) return;
+          setBusy(false, "已完成", 100);
+          if (currentTab === "gif") $("downloadGifBtn").disabled = false;
+          else $("downloadStaticBtn").disabled = false;
+        } catch(err){
+          if (token !== processToken) return;
+          console.error(err);
+          setBusy(false, "处理失败：" + (err?.message || "未知错误"), 0);
+        }
+      }
+
+      async function handleFile(file){
+        try{
+          setBusy(true, "正在读取图片…", 2);
+          const img = await fileToImage(file);
+          loadedImage = img;
+          currentFilename = (file.name || "image").replace(/\.[^.]+$/, "") || "image";
+          $("fileName").textContent = file.name || "image";
+          updateFileCard(img);
+          setBusy(false, "图片读取完成", 8);
+          $("regenBtn").disabled = false;
+          resetResult();
+          await processCurrent();
+        } catch(err){
+          console.error(err);
+          setBusy(false, err?.message || "无法读取图片", 0);
+        }
+      }
+
+      // tab switching
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => setTab(btn.dataset.tab));
+      });
+
+      // upload
+      $("fileInput").addEventListener("change", e => {
+        const file = e.target.files?.[0];
+        if (file) handleFile(file);
+        e.target.value = "";
+      });
+      $("replaceBtn").addEventListener("click", () => $("fileInput").click());
+
+      const drop = $("dropZone");
+      ["dragenter","dragover"].forEach(type => {
+        drop.addEventListener(type, e => { e.preventDefault(); drop.classList.add("drag"); });
+      });
+      ["dragleave","drop"].forEach(type => {
+        drop.addEventListener(type, e => { e.preventDefault(); drop.classList.remove("drag"); });
+      });
+      drop.addEventListener("drop", e => {
+        const file = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith("image/"));
+        if (file) handleFile(file);
+      });
+      document.addEventListener("paste", e => {
+        const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+        const file = item?.getAsFile();
+        if (file) handleFile(file);
+      });
+
+      // gif controls
+      document.querySelectorAll("[data-gif-mode]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          gifMode = btn.dataset.gifMode;
+          document.querySelectorAll("[data-gif-mode]").forEach(b => {
+            b.classList.toggle("active", b === btn);
+          });
+          if (loadedImage && currentTab === "gif") processCurrent();
+        });
+      });
+      $("gifMaxEdge").addEventListener("input", updateSliderLabels);
+      $("gifMaxEdge").addEventListener("change", () => loadedImage && currentTab === "gif" && processCurrent());
+      $("gifDelayA").addEventListener("change", () => loadedImage && currentTab === "gif" && processCurrent());
+      $("gifDelayB").addEventListener("change", () => loadedImage && currentTab === "gif" && processCurrent());
+
+      // static controls
+      document.querySelectorAll("[data-static-preset]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          staticPreset = btn.dataset.staticPreset;
+          document.querySelectorAll("[data-static-preset]").forEach(b => {
+            b.classList.toggle("active", b === btn);
+          });
+          applyPreset(staticPreset);
+          if (loadedImage && currentTab === "static") processCurrent();
+        });
+      });
+
+      ["staticStrength","lineJitter","microBreaks","pseudoContour","textureNoise","fgThreshold","staticMaxEdge"]
+        .forEach(id => {
+          $(id).addEventListener("input", updateSliderLabels);
+          $(id).addEventListener("change", () => loadedImage && currentTab === "static" && processCurrent());
+        });
+
+      $("staticFormat").addEventListener("change", () => loadedImage && currentTab === "static" && processCurrent());
+      $("staticJpegQuality").addEventListener("change", () => loadedImage && currentTab === "static" && processCurrent());
+
+      // general actions
+      $("regenBtn").addEventListener("click", () => loadedImage && processCurrent());
+
+      $("downloadGifBtn").addEventListener("click", () => {
+        if (!currentOutputBlob) return;
+        const url = URL.createObjectURL(currentOutputBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${currentFilename}-antiocr.gif`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+
+      $("downloadStaticBtn").addEventListener("click", () => {
+        if (!currentOutputBlob) return;
+        const url = URL.createObjectURL(currentOutputBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${currentFilename}-antiocr.${currentOutputExt || "png"}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+
+      // init
+      document.querySelectorAll("[data-static-preset]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.staticPreset === "balanced");
+      });
+      applyPreset("balanced");
+      clearStaticPreview();
+      setTab("gif");
+      updateSliderLabels();
+
+      window.addEventListener("beforeunload", () => {
+        if (activeGifEncoder && typeof activeGifEncoder.abort === "function"){
+          try{ activeGifEncoder.abort(); }catch(_err){}
+        }
+      });
+    })();
+    </script>
+  </main>
+</body>
+</html>
